@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,15 +6,36 @@
 #include <sys/stat.h>
 #include <mytool.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/inotify.h>
 #include "SDL_mixer.h"
+
+#define SHM_SIZE 100000
+
+int current_playing = 0;
+filelist fl;
+Mix_Music* music = NULL;
+char* addr = NULL;
+int stop = 0;
 
 
 void config(int *argc, char*** argv);
-void play_mp3(int argc, char** argv);
+void play_mp3();
+void play();
+void list();
+void mp3_pause();
+void mp3_pre();
+void mp3_post();
+void mp3_stop();
+void set_vol(int vol_num);
+void mp3_jump(int num);
+
+enum {PLAY, JUMP, PAUSE, LIST, PRE, POST, VOL, STOP};
 
 int main(int argc, char **argv){
     if(argc < 2){
-        printf("Usage: spiritify <config | play | list | vol | stop>\n");
+        printf("Usage: spiritify <config | play | jump | pause | list | pre | post | vol | stop | kill>\n");
         return 0;
     }
     if(strcmp(argv[1], "config") == 0){
@@ -22,9 +44,55 @@ int main(int argc, char **argv){
     }
 
     if(strcmp(argv[1], "play") == 0){
-        play_mp3(argc, argv);
+        play_mp3();
         return 0;
     }
+
+    if(strcmp(argv[1], "pause") == 0){
+        mp3_pause();
+        return 0;
+    }
+
+
+    if(strcmp(argv[1], "jump") == 0){
+        if(argc < 3){
+            printf("Usage : spiritfy jump <index num>\n");
+        }
+        mp3_jump(atoi(argv[2]));
+        return 0;
+    }
+    
+    if(strcmp(argv[1], "pre") == 0){
+        mp3_pre();
+        return 0;
+    }
+
+    if(strcmp(argv[1], "post") == 0){
+        mp3_post();
+        return 0;
+    }
+    
+    if(strcmp(argv[1], "stop") == 0){
+        mp3_stop();
+        return 0;
+    }
+
+    if(strcmp(argv[1], "vol") == 0){
+        if(argc < 3){
+            printf("Usage : spiritify vol <volume-number(0-128)>\n");
+            return 0;
+        }
+        set_vol(atoi(argv[2]));
+        return 0;
+    }
+
+    if(strcmp(argv[1], "kill") == 0){
+        system("ps aux|grep 'spiritify play'  |grep -v grep | awk '{print $2}'|xargs kill -2");
+    } 
+    
+    if(strcmp(argv[1], "list") == 0){
+        list();
+    } 
 
     return 0;
 }
@@ -76,53 +144,419 @@ void config(int *argc, char*** argv){
     gtk_widget_destroy(dialog);
 }
 
-void quit_mix(Mix_Music *music){
+void list(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *fn = (int *)(addr + 10);
+        char list[100][100];
+        memcpy(list, addr + 10000, 100*100);
+        for(int i = 0; i < *fn; i++){
+            printf("\e[33m%-4d\e[32m%s\e[0m\n", i, list[i]);
+        }
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+
+}
+
+void mp3_pause(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("pause acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = PAUSE;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+
+}
+
+void mp3_pre(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("pre acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = PRE;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+}
+
+void mp3_post(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("post acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = POST;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+}
+
+void mp3_stop(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("stop acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = STOP;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+
+}
+
+void set_vol(int vol_num){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("set volume acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = VOL;
+            int *set_num = (int *)(addr + 60000);
+            *set_num = vol_num;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+}
+
+void mp3_jump(int num){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    if(shm_fd == -1){
+        printf("service not launched\n");
+    }else{
+        addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        int *pid = (int *)addr;
+        if(*pid > 1000){
+            printf("jump acition : service pid is %d \n", *pid);
+            int *action = (int *)(addr + 50000);
+            *action = JUMP;
+            int *set_num = (int *)(addr + 60000);
+            *set_num = num;
+            char buf[20];
+            sprintf(buf, "kill -10 %d",*pid);
+            system(buf);
+        }else{
+            printf("pid < 1000? \n");
+        }
+
+        if (close(shm_fd) == -1) {
+            perror("close fd");
+        }
+    }
+    return;
+
+}
+
+void cleanup(){
+    if(addr != NULL){
+        munmap(addr, SHM_SIZE);
+    }
+    if(shm_unlink("spiritify") == -1){
+        printf("\e[33m clean shm file failed \e[0m\n");
+    } 
+    printf("shm file cleaned up\n");
+}
+
+void quit_mix(){
     if(music != NULL){
         Mix_FreeMusic(music);
+        music = NULL;
     }
     Mix_CloseAudio();
     SDL_Quit(); 
+    printf("exit %d\n", getpid());
+    cleanup();
+    exit(0);
 }
 
 void signal_handler(int sig) {
     printf("Signal received: %d\n", sig);
+    if(sig == SIGINT){
+        stop = 1;
+    }
+    if(sig == SIGUSR1){
+        int *action = (int *)(addr + 50000);
+        switch (*action) {
+            case JUMP:
+                printf("jump to specific index\n");
+                if(music != NULL){
+                    Mix_FreeMusic(music);
+                    music = NULL;
+                }
+                current_playing = *((int *)(addr + 60000));
+                play();
+                break;
+            case PAUSE:
+                printf("service will be paused\n");
+                if(Mix_PausedMusic()){
+                    Mix_ResumeMusic();
+                }else {
+                    Mix_PauseMusic();
+                }
+                break;
+            case PRE:
+                printf("service will play pre music\n");
+                if(music != NULL){
+                    Mix_FreeMusic(music);
+                    music = NULL;
+                }
+                current_playing--;
+                play();
+                break;
+            case POST:
+                printf("service will play post music\n");
+                if(music != NULL){
+                    Mix_FreeMusic(music);
+                    music = NULL;
+                }
+                current_playing++;
+                play();
+                break;
+            case VOL:
+                printf("service will change volume\n");
+                Mix_VolumeMusic(*((int *)(addr + 60000)));
+                break;
+            case STOP:
+                printf("service will stop\n");
+                if(music != NULL){
+                    Mix_FreeMusic(music);
+                    music = NULL;
+                }
+                stop = 1;
+                break;
+            default:
+                printf("what action?\n");
+        }
+    }
 }
 
-void play_mp3(int argc, char** argv){
-    
+void play(){
+    printf("current playing index: %d\n", current_playing);
+    if((current_playing >= 0) && (current_playing < fl.file_nums)){
+        music = Mix_LoadMUS(fl.list[current_playing]);
+        if(music == NULL){
+            fprintf(stderr, "LoadMUS err, %s\n", SDL_GetError());
+            quit_mix();
+        }
+        const char *title;
+        title= Mix_GetMusicTitle(music);
+        if(strlen(title) < 1){
+            title = fl.list[current_playing];
+        }
+        double duration = Mix_MusicDuration(music);
+        printf("title: \e[1;37;42m %s \e[0m\nduration: %d mins %d secs\n", title, (int)duration / 60, (int)duration % 60);
+        //Mix_PlayMusic(music, 0);   
+        Mix_FadeInMusic(music, 0, 1000);
+        if(addr != NULL){
+            int *curr_playing_ptr = (int *)(addr + 20);    
+            *curr_playing_ptr = current_playing;
+        }
+    }
+}
+
+void music_finish(){
+    printf("a music finished\n");
+    if(music != NULL){
+        Mix_FreeMusic(music);
+        music = NULL;
+    }
+    current_playing++;
+    play();
+}
+
+int load_and_list_files(filelist *fl){
+    char *config_home_path;
+    config_home_path = getenv("XDG_CONFIG_HOME");
+    if(strlen(config_home_path) == 0){
+        printf("pls set config_home_path by 'export XDG_CONFIG_HOME=your_config_home_path'\n");
+        return -1;
+    }
+    char *spiritify_config_file_end = "/spiritify/spiritify";
+    char *spiritify_config_file;
+    spiritify_config_file = strcat(config_home_path, spiritify_config_file_end);
+    if(check_file_or_dir_exists(spiritify_config_file) != 1){
+        printf("check config exists: pls run spiritify to choose a directory for datasource\n");
+        return -1;
+    }
+    FILE * file = fopen(spiritify_config_file, "r");
+    char pathbuf[100];
+    memset(pathbuf, 0, sizeof(pathbuf));
+    printf("config file path: %s\n", pathbuf);
+    size_t bytes_read = fread(pathbuf, 1, sizeof(pathbuf) - 1, file);
+    if(bytes_read < 1){
+        printf("read config: pls run spiritify to choose a directory for datasource\n");
+        return -1;
+    }
+    memset(fl->list, 0, 100*100);
+
+    char *ext_buf[100] = {
+        ".mp3",
+        ".flac"
+    };
+    search_file_by_multi_ext(pathbuf, ext_buf, 2, fl); 
+    for(int i = 0; i < fl->file_nums; i++){
+        printf("\e[33m%-4d\e[32m%s\e[0m\n", i, fl->list[i]);
+    }
+
+    printf("before memory opt\n");
+    int *file_nums_ptr = (int *)(addr + 10);
+    *file_nums_ptr = fl->file_nums;  
+    memcpy(addr + 10000, fl->list, 100 * 100);
+    printf("after memory opt\n");
+    return 0; 
+}
+
+
+/**
+* 0-9 bytes ==== pid
+* 10-19 bytes  ==== file_nums
+* 20-29 bytes ==== current_playing
+* 10000-19999 bytes ==== mp3 file paths
+* 50000-100000 bytes ==== command
+* 60000 ==== data send to service
+**/
+int shm_operation(){
+    int shm_fd = shm_open("spiritify", O_RDWR, 0660); 
+    if(shm_fd == -1){
+        printf("there is no shm already exists\n");
+        shm_fd = shm_open("spiritify", O_RDWR | O_CREAT, 0600);
+        if(shm_fd == -1){
+            perror("open/create shm");
+            exit(1);
+        }
+        if(ftruncate(shm_fd, SHM_SIZE) != 0){
+            perror("truncate shm");
+            exit(1);
+        }
+    }
+    addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    int *pid = (int *)addr;
+    if(*pid != 0){
+        printf("is there a instance already run?\n");
+        if(kill(*pid, 0) == 0){
+            printf("yes, it's already running\n");
+            if (close(shm_fd) == -1) {
+                perror("close fd");
+            } 
+            return 1;
+        }
+    }
+    *pid = getpid();
+    if (close(shm_fd) == -1) {
+        perror("close fd");
+    }
+    return 0;
+}
+
+
+void play_mp3(){
     pid_t pid = fork();
     if(pid != 0){
-        printf("spiritify service's pid is %d\n", pid);    
+        printf("spiritify service's pid is \e[034m %d \e[0m\n", pid);    
         return;
     }
-    Mix_Music* music = NULL;
+    if(shm_operation() == 1){
+        return;
+    }
     if(!SDL_Init(SDL_INIT_AUDIO)){
-        quit_mix(NULL);
+        quit_mix();
         return;
     }
 
     if(!Mix_OpenAudio(0, NULL)){
         fprintf(stderr, "open %s\n", SDL_GetError());
-        quit_mix(NULL);
+        quit_mix();
         return;
     }
-   
-    music = Mix_LoadMUS(argv[2]);
-    if(music == NULL){
-        fprintf(stderr, "INIT %s\n", SDL_GetError());
-        quit_mix(NULL);
+    int load_ret;
+    load_ret = load_and_list_files(&fl); 
+    if(load_ret != 0 || fl.file_nums < 1){
+        quit_mix();
+        return;
     }
-    const char *title;
-    title= Mix_GetMusicTitle(music);
-    printf("title: %s\n duration: %f\n", title, Mix_MusicDuration(music));
-    //Mix_PlayMusic(music, 0);   
-    Mix_FadeInMusic(music, 0, 1000);
-    Mix_VolumeMusic(80);
+    play();  
+    Mix_HookMusicFinished(music_finish);
+    Mix_VolumeMusic(50);
     printf("decoder: %s\n", Mix_GetMusicDecoder(0));
     signal(SIGUSR1, signal_handler);
-    pause();
-    FILE *af = fopen("/home/carpenter/tmp/kkk", "w");
-    fwrite("after pause", 11, 1, af);
-    fclose(af);
-    //getchar();
+    signal(SIGINT, signal_handler);
+    while (stop == 0) {
+        pause();
+    }
+    printf("final quit\n");
+    quit_mix();
 }
