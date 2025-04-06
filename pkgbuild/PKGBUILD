@@ -1,0 +1,23 @@
+pkgname=spiritify
+pkgver=1.0.1
+pkgrel=1
+pkgdesc="terminal music playback"
+arch=(x86_64)
+url="https://github.com/lennjf/spiritify-terminal-playback.git"
+license=('GPL')
+makedepends=('git' 'make')
+provides=('spiritify')
+conflicts=('spiritify')
+source=("${pkgname}-${pkgver}::git+https://github.com/lennjf/spiritify-terminal-playback.git")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    make spiritify
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -d "$pkgdir/usr/bin/"
+    install spiritify "$pkgdir/usr/bin/"
+}

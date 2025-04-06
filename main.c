@@ -11,7 +11,6 @@
 #include <sys/inotify.h>
 #include "SDL_mixer.h"
 
-#define SHM_SIZE 100000
 
 int current_playing = 0;
 filelist fl;
@@ -32,6 +31,26 @@ void set_vol(int vol_num);
 void mp3_jump(int num);
 
 enum {PLAY, JUMP, PAUSE, LIST, PRE, POST, VOL, STOP};
+
+#define SHM_SIZE 50000
+#define FILE_LIST_MEM_LENS (100 * 100)
+#define FILE_LIST_ROWS 100
+#define FILE_LIST_COLUMN 100
+
+/**
+* 0 ==== pid
+* 10 ==== file_nums
+* 20 ==== current_playing
+* 10000 ==== mp3 file paths
+* 50000(old) => 30000 bytes ==== action
+* 60000(old) => 40000 ==== data send to service
+**/
+#define SHM_OFFSET_FILE_LENS 10
+#define SHM_OFFSET_CURR_PLAYING 20
+#define SHM_OFFSET_MP3_PATHS 10000
+#define SHM_OFFSET_ACTION 30000
+#define SHM_OFFSET_DATA_SEND 40000
+
 
 int main(int argc, char **argv){
     if(argc < 2){
@@ -150,11 +169,16 @@ void list(){
         printf("service not launched\n");
     }else{
         addr = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-        int *fn = (int *)(addr + 10);
-        char list[100][100];
-        memcpy(list, addr + 10000, 100*100);
+        int *fn = (int *)(addr + SHM_OFFSET_FILE_LENS);
+        char list[FILE_LIST_ROWS][FILE_LIST_COLUMN];
+        memcpy(list, addr + SHM_OFFSET_MP3_PATHS, FILE_LIST_MEM_LENS);
+        int *curr = (int *)(addr + SHM_OFFSET_CURR_PLAYING);
         for(int i = 0; i < *fn; i++){
-            printf("\e[33m%-4d\e[32m%s\e[0m\n", i, list[i]);
+            if(i == *curr){
+                printf("\e[33m%-4d\e[1;32;44m%s\e[0m\n", i, list[i]);
+            }else{
+                printf("\e[33m%-4d\e[32m%s\e[0m\n", i, list[i]);
+            }
         }
         if (close(shm_fd) == -1) {
             perror("close fd");
@@ -173,7 +197,7 @@ void mp3_pause(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("pause acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = PAUSE;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -199,7 +223,7 @@ void mp3_pre(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("pre acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = PRE;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -224,7 +248,7 @@ void mp3_post(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("post acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = POST;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -249,7 +273,7 @@ void mp3_stop(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("stop acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = STOP;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -275,9 +299,9 @@ void set_vol(int vol_num){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("set volume acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = VOL;
-            int *set_num = (int *)(addr + 60000);
+            int *set_num = (int *)(addr + SHM_OFFSET_DATA_SEND);
             *set_num = vol_num;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -302,9 +326,9 @@ void mp3_jump(int num){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("jump acition : service pid is %d \n", *pid);
-            int *action = (int *)(addr + 50000);
+            int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = JUMP;
-            int *set_num = (int *)(addr + 60000);
+            int *set_num = (int *)(addr + SHM_OFFSET_DATA_SEND);
             *set_num = num;
             char buf[20];
             sprintf(buf, "kill -10 %d",*pid);
@@ -349,7 +373,7 @@ void signal_handler(int sig) {
         stop = 1;
     }
     if(sig == SIGUSR1){
-        int *action = (int *)(addr + 50000);
+        int *action = (int *)(addr + SHM_OFFSET_ACTION);
         switch (*action) {
             case JUMP:
                 printf("jump to specific index\n");
@@ -357,7 +381,7 @@ void signal_handler(int sig) {
                     Mix_FreeMusic(music);
                     music = NULL;
                 }
-                current_playing = *((int *)(addr + 60000));
+                current_playing = *((int *)(addr + SHM_OFFSET_DATA_SEND));
                 play();
                 break;
             case PAUSE:
@@ -388,7 +412,7 @@ void signal_handler(int sig) {
                 break;
             case VOL:
                 printf("service will change volume\n");
-                Mix_VolumeMusic(*((int *)(addr + 60000)));
+                Mix_VolumeMusic(*((int *)(addr + SHM_OFFSET_DATA_SEND)));
                 break;
             case STOP:
                 printf("service will stop\n");
@@ -422,7 +446,7 @@ void play(){
         //Mix_PlayMusic(music, 0);   
         Mix_FadeInMusic(music, 0, 1000);
         if(addr != NULL){
-            int *curr_playing_ptr = (int *)(addr + 20);    
+            int *curr_playing_ptr = (int *)(addr + SHM_OFFSET_CURR_PLAYING);    
             *curr_playing_ptr = current_playing;
         }
     }
@@ -461,7 +485,7 @@ int load_and_list_files(filelist *fl){
         printf("read config: pls run spiritify to choose a directory for datasource\n");
         return -1;
     }
-    memset(fl->list, 0, 100*100);
+    memset(fl->list, 0, FILE_LIST_MEM_LENS);
 
     char *ext_buf[100] = {
         ".mp3",
@@ -473,22 +497,13 @@ int load_and_list_files(filelist *fl){
     }
 
     printf("before memory opt\n");
-    int *file_nums_ptr = (int *)(addr + 10);
+    int *file_nums_ptr = (int *)(addr + SHM_OFFSET_FILE_LENS);
     *file_nums_ptr = fl->file_nums;  
-    memcpy(addr + 10000, fl->list, 100 * 100);
+    memcpy(addr + SHM_OFFSET_MP3_PATHS, fl->list, FILE_LIST_MEM_LENS);
     printf("after memory opt\n");
     return 0; 
 }
 
-
-/**
-* 0-9 bytes ==== pid
-* 10-19 bytes  ==== file_nums
-* 20-29 bytes ==== current_playing
-* 10000-19999 bytes ==== mp3 file paths
-* 50000-100000 bytes ==== command
-* 60000 ==== data send to service
-**/
 int shm_operation(){
     int shm_fd = shm_open("spiritify", O_RDWR, 0660); 
     if(shm_fd == -1){
