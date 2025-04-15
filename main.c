@@ -164,7 +164,7 @@ void config(int *argc, char*** argv){
 }
 
 void list(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -189,7 +189,7 @@ void list(){
 }
 
 void mp3_pause(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -224,7 +224,7 @@ void mp3_pause(){
 }
 
 void mp3_pre(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -258,7 +258,7 @@ void mp3_pre(){
 }
 
 void mp3_post(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -292,7 +292,7 @@ void mp3_post(){
 }
 
 void mp3_stop(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -327,7 +327,7 @@ void mp3_stop(){
 }
 
 void set_vol(int vol_num){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -363,7 +363,7 @@ void set_vol(int vol_num){
 }
 
 void mp3_jump(int num){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0600); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("service not launched\n");
     }else{
@@ -559,10 +559,10 @@ int load_and_list_files(filelist *fl){
 }
 
 int shm_operation(){
-    int shm_fd = shm_open("spiritify", O_RDWR, 0660); 
+    int shm_fd = shm_open("spiritify", O_RDWR, 0700); 
     if(shm_fd == -1){
         printf("there is no shm already exists\n");
-        shm_fd = shm_open("spiritify", O_RDWR | O_CREAT, 0600);
+        shm_fd = shm_open("spiritify", O_RDWR | O_CREAT, 0700);
         if(shm_fd == -1){
             perror("open/create shm");
             exit(1);
