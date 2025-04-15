@@ -199,10 +199,10 @@ void mp3_pause(){
             printf("pause acition : service pid is %d \n", *pid);
             if(kill(*pid, 0) != 0){
                 printf("yes, it's not running, will unlink shm\n");
+                shm_unlink("spiritify");
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
                 return;
             }
 
@@ -237,7 +237,7 @@ void mp3_pre(){
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
+                shm_unlink("spiritify");
                 return;
             }
 
@@ -271,7 +271,7 @@ void mp3_post(){
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
+                shm_unlink("spiritify");
                 return;
             }
 
@@ -305,7 +305,7 @@ void mp3_stop(){
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
+                shm_unlink("spiritify");
                 return;
             }
 
@@ -340,7 +340,7 @@ void set_vol(int vol_num){
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
+                shm_unlink("spiritify");
                 return;
             }
 
@@ -376,7 +376,7 @@ void mp3_jump(int num){
                 if (close(shm_fd) == -1) {
                     perror("close fd");
                 } 
-                unlink("spiritify");
+                shm_unlink("spiritify");
                 return;
             }
 
@@ -587,7 +587,7 @@ int shm_operation(){
             if (close(shm_fd) == -1) {
                 perror("close fd");
             } 
-            unlink("spiritify");
+            shm_unlink("spiritify");
             return 1;
 
         }
