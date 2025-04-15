@@ -197,6 +197,15 @@ void mp3_pause(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("pause acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = PAUSE;
             char buf[20];
@@ -223,6 +232,15 @@ void mp3_pre(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("pre acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = PRE;
             char buf[20];
@@ -248,6 +266,15 @@ void mp3_post(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("post acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = POST;
             char buf[20];
@@ -273,6 +300,15 @@ void mp3_stop(){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("stop acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = STOP;
             char buf[20];
@@ -299,6 +335,15 @@ void set_vol(int vol_num){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("set volume acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = VOL;
             int *set_num = (int *)(addr + SHM_OFFSET_DATA_SEND);
@@ -326,6 +371,15 @@ void mp3_jump(int num){
         int *pid = (int *)addr;
         if(*pid > 1000){
             printf("jump acition : service pid is %d \n", *pid);
+            if(kill(*pid, 0) != 0){
+                printf("yes, it's not running, will unlink shm\n");
+                if (close(shm_fd) == -1) {
+                    perror("close fd");
+                } 
+                unlink("spiritify");
+                return;
+            }
+
             int *action = (int *)(addr + SHM_OFFSET_ACTION);
             *action = JUMP;
             int *set_num = (int *)(addr + SHM_OFFSET_DATA_SEND);
@@ -528,6 +582,14 @@ int shm_operation(){
                 perror("close fd");
             } 
             return 1;
+        }else{
+            printf("yes, it's not running, will unlink shm\n");
+            if (close(shm_fd) == -1) {
+                perror("close fd");
+            } 
+            unlink("spiritify");
+            return 1;
+
         }
     }
     *pid = getpid();
@@ -565,7 +627,7 @@ void play_mp3(){
     }
     play();  
     Mix_HookMusicFinished(music_finish);
-    Mix_VolumeMusic(50);
+    Mix_VolumeMusic(20);
     printf("decoder: %s\n", Mix_GetMusicDecoder(0));
     signal(SIGUSR1, signal_handler);
     signal(SIGINT, signal_handler);
